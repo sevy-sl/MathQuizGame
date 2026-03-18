@@ -16,60 +16,78 @@ const randOperator = () => ['+', '-', '*', '/'][randInt(0,3)];
 
 
 const generateQuestion = () => {
-	
-    let a = randInt(1, 20);
+	let a = randInt(1, 10);
 	let b = randInt(1, 20);
 	const op = randOperator();
 
 	if (op === '/') {
-		b = randInt(1,20);
 		a = b * randInt(1,10);
-    };
+	};
 
-    const correct = eval(`${a} ${op} ${b}`);
+	const correct = eval(`${a} ${op} ${b}`);
 
 	let initialOptions = [correct];
 	while(initialOptions.length < 4){
 		let fake = correct + randInt(-3,3);
-		if (fake !== correct && !initialOptions.includes(fake)){
-            initialOptions.push(fake);
-        };
-	};
+		if (fake != correct && !initialOptions.includes(fake)){
+			initialOptions.push(fake);
+		}
+	}
 
 	const options = initialOptions.sort(() => Math.random() - 0.5);
 	return {text: `${a} ${op} ${b} = ?`, correct, options};
 };
 
 
-const handleAnswer = (answer) => {
-	
+const nextStateOnCorrect = (state) => ({
+	score: state.score + 1,
+	currentQuestion: generateQuestion(),
+	timeLeft: 10
+});
+
+
+const nextStateOnWrong = () => ({
+	score: 0,
+	currentQuestion: generateQuestion(),
+	timeLeft: 10
+});
+
+
+const nextStateOnTick = (state) => {
+	if (state.timeLeft <= 1) {
+		return nextStateOnWrong();
+	}
+	return {...state, timeLeft: state.timeLeft - 1};
+};
+
+
+const handleAnswer = (state, answer) => {
     if (answer === state.currentQuestion.correct){
-		state = {score: state.score + 1, currentQuestion: generateQuestion(), timeLeft: 10};
-	} else {
-		state = {score: 0, currentQuestion: generateQuestion(), timeLeft: 10};
-	}
-	renderQuestion();
-};
-
-
-const tick = () => {
-	
-    if(state.timeLeft <= 1){
-		state = {score: 0, currentQuestion: generateQuestion(), timeLeft: 10};
-	} else {
-		state = {...state, timeLeft: state.timeLeft - 1};
-	}
-	renderQuestion();
-};
-
-
-const renderQuestion = () => {
-	
-    if(!state.currentQuestion){
-        return;
+        return nextStateOnCorrect(state);
+    } else {
+        return nextStateOnWrong();  
     };
-	
-    questionDiv.textContent = state.currentQuestion.text;
+};
+
+
+const tick = (state) => nextStateOnTick(state);
+
+
+const update = (newState) => {
+	state = newState;
+	renderQuestion(state);
+};
+
+
+const onAnswer = (answer) => {
+	update(handleAnswer(state, answer));
+};
+
+
+const renderQuestion = (state) => {
+    if (!state.currentQuestion) return;    
+    
+	questionDiv.textContent = state.currentQuestion.text;
 	timerEl.textContent = state.timeLeft;
 	scoreEl.textContent = state.score;
 	answersDiv.innerHTML = '';
@@ -77,13 +95,15 @@ const renderQuestion = () => {
 	state.currentQuestion.options.forEach(opt => {
 		const btn = document.createElement('button');
 		btn.textContent = opt;
-		btn.onclick = () => handleAnswer(opt);
+		btn.onclick = () => onAnswer(opt);
 		answersDiv.appendChild(btn);
 	});
 };
 
 
 state = {...state, currentQuestion: generateQuestion()};
-renderQuestion();
+renderQuestion(state);
 
-setInterval(tick, 1000);
+setInterval(() => {
+	update(tick(state));
+}, 1000);
